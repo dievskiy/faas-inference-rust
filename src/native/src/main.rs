@@ -81,12 +81,10 @@ fn run_inference(model: &FlatBufferModel) -> Result<(u32, f32), &'static str> {
     }
 
     let inputs = interpreter.inputs().to_vec();
-    //assert_eq!(inputs.len(), 1);
 
     let input_index = inputs[0];
 
     let outputs = interpreter.outputs().to_vec();
-    //assert_eq!(outputs.len(), 1);
 
     let output_index = outputs[0];
 
@@ -110,11 +108,6 @@ fn run_inference(model: &FlatBufferModel) -> Result<(u32, f32), &'static str> {
             p.0.iter().map(|&v| v as f32 / 127.5 - 1.0)
         })
         .collect();
-    //assert_eq!(
-    //    input_data.len(),
-    //    (1 * IMAGE_DIMENSION * IMAGE_DIMENSION * 3) as usize,
-    //    "Mismatch in the number of elements for the input tensor."
-    //);
 
     let vec = match interpreter.tensor_data_mut::<f32>(input_index) {
         Err(_) => return Err("Failed tensor_data_mut"),
