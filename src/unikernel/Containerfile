@@ -1,0 +1,11 @@
+FROM scratch
+
+COPY kernel /kernel
+COPY .unikraft/build/initramfs-x86_64.cpio /rootfs.cpio
+
+LABEL "com.urunc.unikernel.binary"="/kernel"
+LABEL "com.urunc.unikernel.cmdline"="kernel /server"
+LABEL "com.urunc.unikernel.unikernelType"="unikraft"
+LABEL "com.urunc.unikernel.initrd"="rootfs.cpio"
+LABEL "com.urunc.unikernel.hypervisor"="firecracker"
+LABEL "com.urunc.unikernel.memory"="512"

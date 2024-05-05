@@ -1,0 +1,245 @@
+---
+- name: update all
+  ansible.builtin.shell: |
+    sudo apt update -y
+    sudo apt upgrade -y
+  args:
+    executable: /bin/bash
+
+- name: Install firecracker
+  ansible.builtin.shell: |
+    wget -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.7.0/firecracker-v1.7.0-x86_64.tgz
+    sudo tar xzf firecracker-v1.7.0-x86_64.tgz
+    cp release-v1.7.0-x86_64/firecracker-v1.7.0-x86_64 /usr/bin/firecracker
+    rm -rf firecracker-v1.7.0-x86_64.tgz release-v1.7.0-x86_64
+  args:
+    executable: /bin/bash
+- name: Check if data directory exists
+  ansible.builtin.stat:
+    path: /home/ubuntu
+  register: home_ubuntu_check
+
+- name: Check if /home/rus/ directory exists
+  ansible.builtin.stat:
+    path: /home/rus/
+  register: home_rus_check
+
+- name: Copy .inputrc to /root/.inputrc
+  ansible.builtin.copy:
+    src: data/.inputrc
+    dest: /root/.inputrc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy .inputrc to /home/rus/.inputrc
+  ansible.builtin.copy:
+    src: data/.inputrc
+    dest: /home/rus/.inputrc
+    owner: rus
+    group: rus
+    mode: "0644"
+  when: home_rus_check.stat.exists
+
+- name: Copy .bashrc to /root/.bashrc
+  ansible.builtin.copy:
+    src: data/.bashrc
+    dest: /root/.bashrc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy .bashrc to /home/rus/.bashrc
+  ansible.builtin.copy:
+    src: data/.bashrc
+    dest: /home/rus/.bashrc
+    owner: rus
+    group: rus
+    mode: "0644"
+  when: home_rus_check.stat.exists
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - wget
+      - bc
+      - make
+      - build-essential
+      - libtool
+      - automake
+      - libyajl-dev
+      - libcap-dev
+      - libsystemd-dev
+      - cmake
+      - libedit-dev
+      - ninja-build
+      - zstd
+      - libzstd-dev
+      - libcurl4-gnutls-dev
+      - libssl-dev
+      - python3
+      - python3-pip
+
+    state: present
+    update_cache: yes
+- name: Install Go and set PATH
+  ansible.builtin.shell: |
+    wget -q https://go.dev/dl/go1.22.1.linux-$(dpkg --print-architecture).tar.gz
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf go1.22.1.linux-$(dpkg --print-architecture).tar.gz
+    sudo tee -a /etc/profile > /dev/null << 'EOT'
+    export PATH=$PATH:/usr/local/go/bin
+    EOT
+    rm -f go1.22.6.linux-$(dpkg --print-architecture).tar.gz
+  args:
+    executable: /bin/bash
+
+- name: Install runc
+  ansible.builtin.shell: |
+    RUNC_VERSION=$(curl -L -s -o /dev/null -w '%{url_effective}' "https://github.com/opencontainers/runc/releases/latest" | grep -oP "v\d+\.\d+\.\d+" | sed 's/v//')
+    wget -q https://github.com/opencontainers/runc/releases/download/v$RUNC_VERSION/runc.$(dpkg --print-architecture)
+    sudo install -m 755 runc.$(dpkg --print-architecture) /usr/local/sbin/runc
+    rm -f ./runc.$(dpkg --print-architecture)
+  args:
+    executable: /bin/bash
+
+- name: Install containerd
+  ansible.builtin.shell: |
+    CONTAINERD_VERSION=$(curl -L -s -o /dev/null -w '%{url_effective}' "https://github.com/containerd/containerd/releases/latest" | grep -oP "v\d+\.\d+\.\d+" | sed 's/v//')
+    wget -q https://github.com/containerd/containerd/releases/download/v$CONTAINERD_VERSION/containerd-$CONTAINERD_VERSION-linux-$(dpkg --print-architecture).tar.gz
+    sudo tar Cxzvf /usr/local containerd-$CONTAINERD_VERSION-linux-$(dpkg --print-architecture).tar.gz
+    sudo rm -f containerd-$CONTAINERD_VERSION-linux-$(dpkg --print-architecture).tar.gz
+  args:
+    executable: /bin/bash
+
+- name: Install contaienrd service
+  ansible.builtin.shell: |
+    CONTAINERD_VERSION=$(curl -L -s -o /dev/null -w '%{url_effective}' "https://github.com/containerd/containerd/releases/latest" | grep -oP "v\d+\.\d+\.\d+" | sed 's/v//')
+    wget -q https://raw.githubusercontent.com/containerd/containerd/v$CONTAINERD_VERSION/containerd.service
+    sudo rm -f /lib/systemd/system/containerd.service
+    sudo mv containerd.service /lib/systemd/system/containerd.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now containerd
+  args:
+    executable: /bin/bash
+
+- name: configure contaienrd
+  ansible.builtin.shell: |
+    sudo mkdir -p /etc/containerd/
+    sudo mv /etc/containerd/config.toml /etc/containerd/config.toml.bak
+    sudo containerd config default | sudo tee /etc/containerd/config.toml
+    sudo systemctl restart containerd
+  args:
+    executable: /bin/bash
+
+- name: Install CNI
+  ansible.builtin.shell: |
+    CNI_VERSION=$(curl -L -s -o /dev/null -w '%{url_effective}' "https://github.com/containernetworking/plugins/releases/latest" | grep -oP "v\d+\.\d+\.\d+" | sed 's/v//')
+    wget -q https://github.com/containernetworking/plugins/releases/download/v$CNI_VERSION/cni-plugins-linux-$(dpkg --print-architecture)-v$CNI_VERSION.tgz
+    sudo mkdir -p /opt/cni/bin
+    sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-$(dpkg --print-architecture)-v$CNI_VERSION.tgz
+    sudo rm -f cni-plugins-linux-$(dpkg --print-architecture)-v$CNI_VERSION.tgz
+  args:
+    executable: /bin/bash
+
+- name: Execute bash command
+  ansible.builtin.shell: lsblk -f | grep containerd
+  register: devmapper_output
+  failed_when: devmapper_output.rc == 3
+
+- name: Setup devmapper
+  ansible.builtin.shell: |
+    sudo mkdir -p /usr/local/bin/scripts
+    git clone -b unikraft-elfloader-integration https://github.com/dievskiy/urunc.git
+
+    sudo cp urunc/script/dm_create.sh /usr/local/bin/scripts/dm_create.sh
+    sudo chmod 755 /usr/local/bin/scripts/dm_create.sh
+
+    sudo cp urunc/script/dm_reload.sh /usr/local/bin/scripts/dm_reload.sh
+    sudo chmod 755 /usr/local/bin/scripts/dm_reload.sh
+
+    sudo mkdir -p /usr/local/lib/systemd/system/
+
+    sudo cp urunc/script/dm_reload.service /usr/local/lib/systemd/system/dm_reload.service
+    sudo chmod 644 /usr/local/lib/systemd/system/dm_reload.service
+    sudo chown root:root /usr/local/lib/systemd/system/dm_reload.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable dm_reload.service
+  args:
+    executable: /bin/bash
+  when: devmapper_output.rc != 0
+
+- name: Configure devmapper
+  ansible.builtin.shell: |
+    sudo sed -i '/\[plugins\."io\.containerd\.snapshotter\.v1\.devmapper"\]/,/^$/d' /etc/containerd/config.toml
+    sudo tee -a /etc/containerd/config.toml > /dev/null <<'EOT'
+
+    # Customizations for urunc
+
+    [plugins."io.containerd.snapshotter.v1.devmapper"]
+      pool_name = "containerd-pool"
+      root_path = "/var/lib/containerd/io.containerd.snapshotter.v1.devmapper"
+      base_image_size = "10GB"
+      discard_blocks = true
+      fs_type = "ext2" # or xfs
+    EOT
+    sudo systemctl restart containerd
+  args:
+    executable: /bin/bash
+  when: devmapper_output.rc != 0
+
+- name: Configure devmapper
+  ansible.builtin.shell: |
+    sudo /usr/local/bin/scripts/dm_create.sh
+    sleep 3
+  args:
+    executable: /bin/bash
+  when: devmapper_output.rc != 0
+
+- name: Verify devmapper is successful
+  ansible.builtin.shell: |
+    ctr plugin ls | grep devmap | grep -v error
+  args:
+    executable: /bin/bash
+
+- name: Add urunc to contarinerd
+  ansible.builtin.shell: |
+    sudo tee -a /etc/containerd/config.toml > /dev/null <<EOT
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.urunc]
+        runtime_type = "io.containerd.urunc.v2"
+        container_annotations = ["com.urunc.unikernel.*"]
+        pod_annotations = ["com.urunc.unikernel.*"]
+        snapshotter = "devmapper"
+    EOT
+    sudo systemctl restart containerd
+  args:
+    executable: /bin/bash
+  when: devmapper_output.rc != 0
+
+- name: Install nerdctl
+  ansible.builtin.shell: |
+    NERDCTL_VERSION=$(curl -L -s -o /dev/null -w '%{url_effective}' "https://github.com/containerd/nerdctl/releases/latest" | grep -oP "v\d+\.\d+\.\d+" | sed 's/v//')
+    wget -q https://github.com/containerd/nerdctl/releases/download/v$NERDCTL_VERSION/nerdctl-$NERDCTL_VERSION-linux-$(dpkg --print-architecture).tar.gz
+    sudo tar Cxzvf /usr/local/bin nerdctl-$NERDCTL_VERSION-linux-$(dpkg --print-architecture).tar.gz
+    sudo rm -f nerdctl-$NERDCTL_VERSION-linux-$(dpkg --print-architecture).tar.gz
+  args:
+    executable: /bin/bash
+
+- name: Install urunc
+  ansible.builtin.shell: |
+    export PATH="$PATH:/usr/local/go/bin/"
+    git clone https://github.com/nubificus/urunc
+    cd urunc
+    make && make install
+  args:
+    executable: /bin/bash
+
+- name: Install grpcurl
+  ansible.builtin.shell: |
+    wget -q https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz
+    tar xzf grpcurl_1.8.9_linux_x86_64.tar.gz
+    mv grpcurl /usr/local/bin/
+    rm -f grpcurl_1.8.9_linux_x86_64.tar.gz
+  args:
+    executable: /bin/bash

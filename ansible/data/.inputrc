@@ -1,0 +1,10 @@
+set editing-mode vi
+$if mode=vi
+        set keymap vi-insert
+        "\x0F": "\e"
+        "\x10": history-search-backward
+$endif
+
+set keymap vi-command
+"v": redraw-current-line
+

@@ -1,0 +1,8 @@
+FROM scratch
+COPY wasm/inference.wasm /
+COPY densenet201.tflite /
+COPY sample.png /
+COPY wasm/libtensorflowlite_c.so /
+COPY wasm/libtensorflowlite_flex.so /
+COPY wasm/libwasmedgePluginWasiNN.so /
+CMD ["/inference.wasm"]

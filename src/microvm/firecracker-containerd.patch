@@ -1,0 +1,36 @@
+diff --git a/Makefile b/Makefile
+index b7ac1b2..c236a7d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -11,7 +11,8 @@
+ # express or implied. See the License for the specific language governing
+ # permissions and limitations under the License.
+
+-SUBDIRS:=agent runtime examples firecracker-control/cmd/containerd snapshotter docker-credential-mmds volume
++# SUBDIRS:=agent runtime examples firecracker-control/cmd/containerd snapshotter docker-credential-mmds volume
++SUBDIRS:=agent runtime firecracker-control/cmd/containerd docker-credential-mmds volume
+ TEST_SUBDIRS:=$(addprefix test-,$(SUBDIRS))
+ INTEG_TEST_SUBDIRS:=$(addprefix integ-test-,$(SUBDIRS))
+
+diff --git a/runtime/helpers.go b/runtime/helpers.go
+index e4f1977..9b28e6f 100644
+--- a/runtime/helpers.go
++++ b/runtime/helpers.go
+@@ -26,7 +26,7 @@ import (
+ )
+
+ const (
+-       defaultMemSizeMb = 128
++       defaultMemSizeMb = 1024
+        defaultCPUCount  = 1
+ )
+
+@@ -53,6 +53,19 @@ func machineConfigurationFromProto(cfg *config.Config, req *proto.FirecrackerMac
+        if size := req.MemSizeMib; size > 0 {
+                config.MemSizeMib = firecracker.Int64(int64(size))
+        }
++
++       config.VcpuCount = firecracker.Int64(int64(1))
++       config.MemSizeMib = firecracker.Int64(int64(1024))
+
+        config.Smt = firecracker.Bool(req.HtEnabled)

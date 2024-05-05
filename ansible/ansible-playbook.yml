@@ -1,0 +1,10 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Update the instance with the latest packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+  roles:
+    - setup
