@@ -1,4 +1,4 @@
-This repository contains the code needed to build an ML inference application using DenseNet201 model and deploy it to container-, gVisor-, firecracker-, and unikraft-based runtimes.
+This repository contains the code needed to build an ML inference application using DenseNet201 model and deploy it to container-, firecracker-, Wasm-, and unikraft-based runtimes.
 The project requires x86_64 architecture.
 
 ## Native
